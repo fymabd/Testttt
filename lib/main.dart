@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dartd:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -36,7 +36,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
   final TextEditingController _spamCountController = TextEditingController(text: '5');
   final TextEditingController _clearCountController = TextEditingController(text: '10');
 
-  // RPC Controllers
   final TextEditingController _rpcNameController = TextEditingController(text: 'Flutter Engine');
   final TextEditingController _rpcDetailsController = TextEditingController(text: 'تحكم كامل من التطبيق');
   final TextEditingController _rpcStateController = TextEditingController(text: 'Online');
@@ -50,7 +49,7 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
   String _myUserId = '';
 
   // ----------------------------------------------------
-  // 1. الاتصال بدبيسكورد عبر WebSocket
+  // 1. الاتصال بـ Discord Gateway v10 المعدل
   // ----------------------------------------------------
   void _connectToDiscord() {
     final token = _tokenController.text.trim();
@@ -59,12 +58,19 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
       return;
     }
 
+    _wsChannel?.sink.close();
+    _heartbeatTimer?.cancel();
+
     setState(() {
-      _statusMessage = 'جاري الاتصال...';
+      _statusMessage = 'جاري محاولة الاتصال بـ Gateway v10...';
     });
 
     try {
-      _wsChannel = IOWebSocketChannel.connect(Uri.parse('wss://gateway.discord.gg/?v=9&encoding=json'));
+      // التحديث لـ Gateway v10
+      _wsChannel = IOWebSocketChannel.connect(
+        Uri.parse('wss://gateway.discord.gg/?v=10&encoding=json'),
+      );
+
       _wsChannel!.stream.listen(
         (data) {
           final payload = jsonDecode(data);
@@ -72,17 +78,19 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
           final t = payload['t'];
           final d = payload['d'];
 
+          // OP 10: Hello -> إرسال Heartbeat وتصريح الدخول
           if (op == 10) {
             int heartbeatInterval = d['heartbeat_interval'];
             _startHeartbeat(heartbeatInterval);
             _sendIdentify(token);
           }
 
+          // تم الاتصال وحفظ بيانات المستخدم
           if (t == 'READY') {
             setState(() {
               _isConnected = true;
               _myUserId = d['user']['id'];
-              _statusMessage = 'متصل باسم: ${d['user']['username']}';
+              _statusMessage = 'تم الاتصال: ${d['user']['username']}';
             });
             _showSnackBar('تم الاتصال بنجاح!');
           }
@@ -90,13 +98,13 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
         onError: (err) {
           setState(() {
             _isConnected = false;
-            _statusMessage = 'حدث خطأ في الاتصال';
+            _statusMessage = 'خطأ في شبكة الاتصال: $err';
           });
         },
         onDone: () {
           setState(() {
             _isConnected = false;
-            _statusMessage = 'تم قطع الاتصال';
+            _statusMessage = 'تم إغلاق الاتصال من ديسكورد (تأكد من صحة التوكين والشبكة)';
           });
         },
       );
@@ -114,33 +122,70 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
     });
   }
 
+  // محاكاة خصائص متصفح إلكترون الاصلي لمنع الرفض الحسابي
   void _sendIdentify(String token) {
     final payload = {
       'op': 2,
       'd': {
         'token': token,
-        'capabilities': 125,
-        'properties': {'os': 'Android', 'browser': 'CustomApp', 'device': ''},
+        'capabilities': 8189,
+        'properties': {
+          'os': 'Windows',
+          'browser': 'Chrome',
+          'device': '',
+          'system_locale': 'en-US',
+          'browser_user_agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'browser_version': '120.0.0.0',
+          'os_version': '10',
+          'referrer': '',
+          'referring_domain': '',
+          'search_engine': 'google',
+          'client_build_number': 260000,
+        },
+        'presence': {
+          'status': 'online',
+          'since': 0,
+          'activities': [],
+          'afk': false
+        },
+        'compress': false,
+        'client_state': {
+          'guild_versions': {},
+          'highest_last_message_id': '0',
+          'read_state_version': 0,
+          'user_guild_settings_version': -1,
+          'user_settings_version': -1,
+        }
       }
     };
     _wsChannel?.sink.add(jsonEncode(payload));
   }
 
   // ----------------------------------------------------
-  // 2. التحكم في الأوامر (إرسال، مسح، سبام، RPC)
+  // 2. أوامر التحكم بالرسائل و RPC
   // ----------------------------------------------------
   Future<void> _sendMessage() async {
     final channelId = _channelIdController.text.trim();
     final msg = _messageController.text.trim();
     if (channelId.isEmpty || msg.isEmpty) return;
 
-    await http.post(
-      Uri.parse('https://discord.com/api/v9/channels/$channelId/messages'),
-      headers: {'authorization': _tokenController.text.trim(), 'content-type': 'application/json'},
+    final res = await http.post(
+      Uri.parse('https://discord.com/api/v10/channels/$channelId/messages'),
+      headers: {
+        'authorization': _tokenController.text.trim(),
+        'content-type': 'application/json',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
       body: jsonEncode({'content': msg}),
     );
-    _messageController.clear();
-    _showSnackBar('تم إرسال الرسالة!');
+
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      _messageController.clear();
+      _showSnackBar('تم إرسال الرسالة!');
+    } else {
+      _showSnackBar('فشل الإرسال: كود ${res.statusCode}');
+    }
   }
 
   Future<void> _sendSpam() async {
@@ -152,11 +197,15 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
 
     for (int i = 0; i < count; i++) {
       await http.post(
-        Uri.parse('https://discord.com/api/v9/channels/$channelId/messages'),
-        headers: {'authorization': _tokenController.text.trim(), 'content-type': 'application/json'},
+        Uri.parse('https://discord.com/api/v10/channels/$channelId/messages'),
+        headers: {
+          'authorization': _tokenController.text.trim(),
+          'content-type': 'application/json',
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
         body: jsonEncode({'content': msg}),
       );
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 400));
     }
     _showSnackBar('تم الانتهاء من الـ Spam!');
   }
@@ -170,8 +219,11 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
     int deleted = 0;
 
     final res = await http.get(
-      Uri.parse('https://discord.com/api/v9/channels/$channelId/messages?limit=100'),
-      headers: {'authorization': _tokenController.text.trim()},
+      Uri.parse('https://discord.com/api/v10/channels/$channelId/messages?limit=100'),
+      headers: {
+        'authorization': _tokenController.text.trim(),
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
     );
 
     if (res.statusCode == 200) {
@@ -180,11 +232,14 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
         if (m['author']['id'] == _myUserId) {
           String msgId = m['id'];
           await http.delete(
-            Uri.parse('https://discord.com/api/v9/channels/$channelId/messages/$msgId'),
-            headers: {'authorization': _tokenController.text.trim()},
+            Uri.parse('https://discord.com/api/v10/channels/$channelId/messages/$msgId'),
+            headers: {
+              'authorization': _tokenController.text.trim(),
+              'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            },
           );
           deleted++;
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future.delayed(const Duration(milliseconds: 400));
           if (deleted >= target) break;
         }
       }
@@ -229,7 +284,7 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
   }
 
   // ----------------------------------------------------
-  // 3. الواجهات (UI)
+  // 3. بناء الواجهات
   // ----------------------------------------------------
   @override
   Widget build(BuildContext context) {
