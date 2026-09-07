@@ -1,9 +1,14 @@
-name: discord_selfbot
-description: Discord Selfbot engine written purely in Dart.
+name: discord_controller
+description: Flutter Discord Selfbot Controller App
 version: 1.0.0
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
+  flutter:
+    sdk: flutter
   web_socket_channel: ^2.4.0
   http: ^1.1.0
+
+flutter:
+  uses-material-design: true
