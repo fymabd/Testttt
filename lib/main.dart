@@ -3,17 +3,17 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 void main() {
-  runApp(const SelfbotApp());
+  runApp(const DiscordDirectApp());
 }
 
-class SelfbotApp extends StatelessWidget {
-  const SelfbotApp({Key? key}) : super(key: key);
+class DiscordDirectApp extends StatelessWidget {
+  const DiscordDirectApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Selfbot Manager',
+      title: 'Discord Direct Controller',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF1E1E2E),
         colorScheme: const ColorScheme.dark(
@@ -34,50 +34,46 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final _serverUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _userIdController = TextEditingController();
+  // الاتصال المباشر عبر التوكن
+  final _tokenController = TextEditingController();
 
-  String _selectedType = 'STREAMING';
-  final _titleController = TextEditingController();
-  final _detailsController = TextEditingController();
-  final _stateController = TextEditingController();
-  final _streamUrlController = TextEditingController();
-  final _largeImgController = TextEditingController();
-  final _smallImgController = TextEditingController();
-  final _btn1LabelController = TextEditingController();
-  final _btn1UrlController = TextEditingController();
-
+  // إعدادات الـ RPC والحالة
+  String _selectedStatus = 'online';
+  final _customStatusController = TextEditingController();
   final _clearChannelController = TextEditingController();
   final _clearCountController = TextEditingController(text: '10');
 
-  Future<void> _sendApiRequest(String endpoint, Map<String, dynamic> bodyData) async {
-    final baseUrl = _serverUrlController.text.trim();
-    final apiKey = _apiKeyController.text.trim();
+  // إرسال طلب مباشرة لـ Discord API
+  Future<void> _sendDiscordRequest(String endpoint, Map<String, dynamic> bodyData, {String method = 'PATCH'}) async {
+    final token = _tokenController.text.trim();
 
-    if (baseUrl.isEmpty || apiKey.isEmpty) {
-      _showSnackBar('يرجى كتابة رابط سيرفر Replit ومفتاح الـ API أولاً', isError: true);
+    if (token.isEmpty) {
+      _showSnackBar('يرجى إدخال Discord Token أولاً', isError: true);
       return;
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: jsonEncode(bodyData),
-      );
+    final url = Uri.parse('https://discord.com/api/v9$endpoint');
+    final headers = {
+      'Authorization': token,
+      'Content-Type': 'application/json',
+    };
 
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200 && data['success'] == true) {
-        _showSnackBar(data['message'] ?? 'تم تنفيذ الأمر بنجاح 🎉');
+    try {
+      http.Response response;
+      if (method == 'PATCH') {
+        response = await http.patch(url, headers: headers, body: jsonEncode(bodyData));
       } else {
-        _showSnackBar(data['error'] ?? 'حدث خطأ في التنفيذ', isError: true);
+        response = await http.post(url, headers: headers, body: jsonEncode(bodyData));
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _showSnackBar('تم تحديث الحساب بنجاح 🎉');
+      } else {
+        final err = jsonDecode(response.body);
+        _showSnackBar('خطأ من الديسكورد: ${err['message'] ?? response.statusCode}', isError: true);
       }
     } catch (e) {
-      _showSnackBar('فشل الاتصال بالسيرفر، تأكد من رابط Replit', isError: true);
+      _showSnackBar('فشل الاتصال بالشبكة، تأكد من اتصالك بالإنترنت', isError: true);
     }
   }
 
@@ -94,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة تحكم السيلف بوت'),
+        title: const Text('التحكم المباشر بالديسكورد'),
         centerTitle: true,
         backgroundColor: const Color(0xFF181825),
       ),
@@ -102,61 +98,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // 1. تسجيل الدخول بالتوكن
             _buildCard(
-              title: '⚙️ ربط السيرفر والحساب',
+              title: '🔑 التوكن الخاص بك',
               child: Column(
                 children: [
-                  _buildTextField(_serverUrlController, 'رابط سيرفر Replit (مثل https://app.replit.dev)'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_apiKeyController, 'مفتاح الأمان (API Key)', obscureText: true),
-                  const SizedBox(height: 10),
-                  _buildTextField(_userIdController, 'User ID (آيدي حسابك بالديسكورد)'),
+                  _buildTextField(_tokenController, 'Discord User Token', obscureText: true),
                 ],
               ),
             ),
             const SizedBox(height: 16),
+
+            // 2. التحكم بالحالة العامة
             _buildCard(
-              title: '🎭 التحكم بالحالة والـ RPC',
+              title: '🎭 تغيير الحالة (Status)',
               child: Column(
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _selectedType,
+                    value: _selectedStatus,
                     dropdownColor: const Color(0xFF313244),
-                    decoration: const InputDecoration(labelText: 'نوع النشاط', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'نوع الحالة', border: OutlineInputBorder()),
                     items: const [
-                      DropdownMenuItem(value: 'STREAMING', child: Text('بث مباشر (Streaming)')),
-                      DropdownMenuItem(value: 'WATCHING', child: Text('يشاهد (Watching)')),
-                      DropdownMenuItem(value: 'PLAYING', child: Text('يلعب (Playing)')),
-                      DropdownMenuItem(value: 'LISTENING', child: Text('يستمع (Listening)')),
+                      DropdownMenuItem(value: 'online', child: Text('متصل (Online)')),
+                      DropdownMenuItem(value: 'idle', child: Text('خامل (Idle)')),
+                      DropdownMenuItem(value: 'dnd', child: Text('عدم الإزعاج (DND)')),
+                      DropdownMenuItem(value: 'invisible', child: Text('مخفي (Invisible)')),
                     ],
-                    onChanged: (val) => setState(() => _selectedType = val!),
+                    onChanged: (val) => setState(() => _selectedStatus = val!),
                   ),
                   const SizedBox(height: 10),
-                  _buildTextField(_titleController, 'العنوان الرئيسي (Title)'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_detailsController, 'التفاصيل (Details) - السطر الأول'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_stateController, 'الحالة (State) - السطر الثاني'),
-                  const SizedBox(height: 10),
-                  if (_selectedType == 'STREAMING') ...[
-                    _buildTextField(_streamUrlController, 'رابط الستريم (Twitch/YouTube)'),
-                    const SizedBox(height: 10),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField(_largeImgController, 'الصورة الكبيرة (URL)')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildTextField(_smallImgController, 'الصورة الصغيرة (URL)')),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField(_btn1LabelController, 'اسم الزر')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildTextField(_btn1UrlController, 'رابط الزر')),
-                    ],
-                  ),
+                  _buildTextField(_customStatusController, 'النص المخصص (Custom Status)'),
                   const SizedBox(height: 15),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -164,46 +135,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       minimumSize: const Size.fromHeight(50),
                     ),
                     onPressed: () {
-                      _sendApiRequest('/api/app/presence', {
-                        'userId': _userIdController.text.trim(),
-                        'type': _selectedType,
-                        'title': _titleController.text,
-                        'details': _detailsController.text,
-                        'state': _stateController.text,
-                        'url': _streamUrlController.text,
-                        'largeImage': _largeImgController.text,
-                        'smallImage': _smallImgController.text,
-                        'button1Label': _btn1LabelController.text,
-                        'button1Url': _btn1UrlController.text,
+                      _sendDiscordRequest('/users/@me/settings', {
+                        'status': _selectedStatus,
+                        'custom_status': {
+                          'text': _customStatusController.text,
+                        }
                       });
                     },
-                    child: const Text('تحديث الحالة والـ RPC', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildCard(
-              title: '🧹 مسح الرسائل (Clear)',
-              child: Column(
-                children: [
-                  _buildTextField(_clearChannelController, 'ID الروم (Channel ID)'),
-                  const SizedBox(height: 10),
-                  _buildTextField(_clearCountController, 'عدد الرسائل', isNumber: true),
-                  const SizedBox(height: 15),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      minimumSize: const Size.fromHeight(50),
-                    ),
-                    onPressed: () {
-                      _sendApiRequest('/api/app/clear', {
-                        'userId': _userIdController.text.trim(),
-                        'channelId': _clearChannelController.text.trim(),
-                        'count': int.tryParse(_clearCountController.text) ?? 10,
-                      });
-                    },
-                    child: const Text('مسح الرسائل', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text('تطبيق الحالة فوراً', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -233,11 +172,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool obscureText = false, bool isNumber = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, {bool obscureText = false}) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
