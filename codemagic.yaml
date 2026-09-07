@@ -1,17 +1,20 @@
 workflows:
   android-workflow:
-    name: Android APK Build
+    name: Build Direct App APK
     instance_type: mac_mini_m1
     max_build_duration: 30
     environment:
       flutter: stable
     scripts:
-      - name: Create Android folder if missing
+      - name: Generate Android Skeleton
         script: |
-          if [ ! -d "android" ]; then
-            flutter create . --platforms=android --org=com.example
-          fi
-      - name: Get Flutter packages
+          mkdir temp_app
+          cd temp_app
+          flutter create . --platforms=android --org=com.example
+          cp -R android ..
+          cd ..
+          rm -rf temp_app
+      - name: Get packages
         script: |
           flutter pub get
       - name: Build APK
