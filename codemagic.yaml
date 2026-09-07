@@ -6,14 +6,10 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Generate Android Skeleton
+      - name: Clean and Regenerate Fresh Android Project
         script: |
-          mkdir temp_app
-          cd temp_app
-          flutter create . --platforms=android --org=com.example
-          cp -R android ..
-          cd ..
-          rm -rf temp_app
+          rm -rf android
+          flutter create . --platforms=android --org=com.example --template=app
       - name: Get packages
         script: |
           flutter pub get
