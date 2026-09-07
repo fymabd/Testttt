@@ -6,11 +6,20 @@ import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: SelfbotControlApp(),
-    themeMode: ThemeMode.dark,
-  ));
+  runApp(const SelfbotAppWrapper());
+}
+
+class SelfbotAppWrapper extends StatelessWidget {
+  const SelfbotAppWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(),
+      home: const SelfbotControlApp(),
+    );
+  }
 }
 
 class SelfbotControlApp extends StatefulWidget {
@@ -21,7 +30,6 @@ class SelfbotControlApp extends StatefulWidget {
 }
 
 class _SelfbotControlAppState extends State<SelfbotControlApp> {
-  // الكنترولرز للتحكم بالنصوص
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _channelIdController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
@@ -65,7 +73,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
           final d = payload['d'];
 
           if (op == 10) {
-            // Hello -> بدء نبضات القلب والتعريف
             int heartbeatInterval = d['heartbeat_interval'];
             _startHeartbeat(heartbeatInterval);
             _sendIdentify(token);
@@ -122,8 +129,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
   // ----------------------------------------------------
   // 2. التحكم في الأوامر (إرسال، مسح، سبام، RPC)
   // ----------------------------------------------------
-  
-  // إرسال رسالة عادية
   Future<void> _sendMessage() async {
     final channelId = _channelIdController.text.trim();
     final msg = _messageController.text.trim();
@@ -138,7 +143,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
     _showSnackBar('تم إرسال الرسالة!');
   }
 
-  // إرسال سبام
   Future<void> _sendSpam() async {
     final channelId = _channelIdController.text.trim();
     final msg = _messageController.text.trim();
@@ -157,7 +161,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
     _showSnackBar('تم الانتهاء من الـ Spam!');
   }
 
-  // مسح الرسائل (Clear)
   Future<void> _clearMessages() async {
     final channelId = _channelIdController.text.trim();
     int target = int.tryParse(_clearCountController.text) ?? 10;
@@ -165,7 +168,7 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
 
     _showSnackBar('جاري مسح الرسائل...');
     int deleted = 0;
-    
+
     final res = await http.get(
       Uri.parse('https://discord.com/api/v9/channels/$channelId/messages?limit=100'),
       headers: {'authorization': _tokenController.text.trim()},
@@ -189,7 +192,6 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
     }
   }
 
-  // تحديث الـ Rich Presence (RPC)
   void _updateRpc() {
     if (!_isConnected) return;
 
@@ -231,135 +233,139 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
   // ----------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    return ThemeDataWrapper(
-      child: Scaffold,
-      body: Scaffold(
-        appBar: AppBar(
-          title: const Text('لوحة تحكم السيلف بوت (Selfbot App)'),
-          backgroundColor: Colors.indigo.shade900,
-          actions: [
-            Padding(
-              Padding: const EdgeInsets.all(8.0),
-              child: Center(
-                child: Text(_isConnected ? '🟢 متصل' : '🔴 غير متصل',
-                    style: TextStyle(color: _isConnected ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة تحكم السيلف بوت'),
+        backgroundColor: Colors.indigo.shade900,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(
+              child: Text(
+                _isConnected ? '🟢 متصل' : '🔴 غير متصل',
+                style: TextStyle(
+                  color: _isConnected ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            )
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // قسم تسجيل الدخول
-              _buildCard('1. إعداد الحساب', [
+            ),
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCard('1. إعداد الحساب', [
+              TextField(
+                controller: _tokenController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'التوكين (Discord Token)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _connectToDiscord,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                child: Text(_isConnected ? 'إعادة الاتصال' : 'تشغيل الربط'),
+              ),
+              const SizedBox(height: 5),
+              Text('الحالة: $_statusMessage', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ]),
+            const SizedBox(height: 15),
+            if (_isConnected) ...[
+              _buildCard('2. التحكم بالرسائل والقنوات', [
                 TextField(
-                  controller: _tokenController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'التوكين (Discord Token)', border: OutlineInputBorder()),
+                  controller: _channelIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'آيدي الروم (Channel ID)',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _messageController,
+                  decoration: const InputDecoration(
+                    labelText: 'محتوى الرسالة',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _sendMessage,
+                        child: const Text('إرسال رسالة'),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 30),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _spamCountController,
+                        decoration: const InputDecoration(labelText: 'عدد التكرار (Spam)'),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: _sendSpam,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800),
+                      child: const Text('بدء الـ Spam'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _clearCountController,
+                        decoration: const InputDecoration(labelText: 'عدد الرسائل المراد مسحها'),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: _clearMessages,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade800),
+                      child: const Text('مسح رسائلي (Clear)'),
+                    ),
+                  ],
+                ),
+              ]),
+              const SizedBox(height: 15),
+              _buildCard('3. إعدادات Rich Presence (الحالة والبروفايل)', [
+                TextField(controller: _rpcNameController, decoration: const InputDecoration(labelText: 'اسم النشاط (Name)')),
+                const SizedBox(height: 5),
+                TextField(controller: _rpcDetailsController, decoration: const InputDecoration(labelText: 'التفاصيل (Details)')),
+                const SizedBox(height: 5),
+                TextField(controller: _rpcStateController, decoration: const InputDecoration(labelText: 'الحالة (State)')),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: _buttonLabelController, decoration: const InputDecoration(labelText: 'اسم الزر'))),
+                    const SizedBox(width: 5),
+                    Expanded(child: TextField(controller: _buttonUrlController, decoration: const InputDecoration(labelText: 'رابط الزر'))),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 ElevatedButton(
-                  onPressed: _connectToDiscord,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                  child: Text(_isConnected ? 'إعادة الاتصال' : 'تشغيل الربط'),
+                  onPressed: _updateRpc,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800),
+                  child: const Text('تطبيق الـ Rich Presence'),
                 ),
-                const SizedBox(height: 5),
-                Text('الحالة: $_statusMessage', style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ]),
-
-              const SizedBox(height: 15),
-
-              // قسم إرسال الأوامر والتحكم بالرومات
-              if (_isConnected) ...[
-                _buildCard('2. التحكم بالرسائل والقنوات', [
-                  TextField(
-                    controller: _channelIdController,
-                    decoration: const InputDecoration(labelText: 'آيدي الروم (Channel ID)', border: OutlineInputBorder()),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(labelText: 'محتوى الرسالة', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _sendMessage,
-                          child: const Text('إرسال رسالة'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 30),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _spamCountController,
-                          decoration: const InputDecoration(labelText: 'عدد التكرار (Spam)'),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _sendSpam,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800),
-                        child: const Text('بدء الـ Spam'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _clearCountController,
-                          decoration: const InputDecoration(labelText: 'عدد الرسائل المراد مسحها'),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _clearMessages,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade800),
-                        child: const Text('مسح رسائلي (Clear)'),
-                      ),
-                    ],
-                  ),
-                ]),
-
-                const SizedBox(height: 15),
-
-                // قسم الـ Rich Presence (RPC)
-                _buildCard('3. إعدادات Rich Presence (الحالة والبروفايل)', [
-                  TextField(controller: _rpcNameController, decoration: const InputDecoration(labelText: 'اسم النشاط (Name)')),
-                  const SizedBox(height: 5),
-                  TextField(controller: _rpcDetailsController, decoration: const InputDecoration(labelText: 'التفاصيل (Details)')),
-                  const SizedBox(height: 5),
-                  TextField(controller: _rpcStateController, decoration: const InputDecoration(labelText: 'الحالة (State)')),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _buttonLabelController, decoration: const InputDecoration(labelText: 'اسم الزر'))),
-                      const SizedBox(width: 5),
-                      Expanded(child: TextField(controller: _buttonUrlController, decoration: const InputDecoration(labelText: 'رابط الزر'))),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _updateRpc,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800),
-                    child: const Text('تطبيق الـ Rich Presence'),
-                  ),
-                ]),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -374,26 +380,15 @@ class _SelfbotControlAppState extends State<SelfbotControlApp> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigoAccent)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigoAccent),
+            ),
             const SizedBox(height: 10),
             ...children,
           ],
         ),
       ),
-    );
-  }
-}
-
-class ThemeDataWrapper extends StatelessWidget {
-  final Widget child;
-  const ThemeDataWrapper({super.key, required this.child, required Type child});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData.dark(),
-      home: child,
-      debugShowCheckedModeBanner: false,
     );
   }
 }
