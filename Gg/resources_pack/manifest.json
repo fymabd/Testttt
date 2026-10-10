@@ -5,7 +5,7 @@
     "description": "HUD drop buttons for Quick Utility.",
     "uuid": "6b72f1d6-2152-4a03-bc22-51db7ed81e21",
     "version": [1, 0, 0],
-    "min_engine_version": [1, 26, 60]
+    "min_engine_version": [1, 20, 50]
   },
   "modules": [
     {
