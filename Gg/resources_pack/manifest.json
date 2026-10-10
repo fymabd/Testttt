@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Quick Utility - Resource Pack",
+    "description": "HUD drop buttons for Quick Utility.",
+    "uuid": "6b72f1d6-2152-4a03-bc22-51db7ed81e21",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 26, 60]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "1604fa4d-5b49-4a80-a707-41d8ecde5935",
+      "version": [1, 0, 0]
+    }
+  ]
+}
