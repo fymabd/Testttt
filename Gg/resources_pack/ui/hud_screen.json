@@ -1,0 +1,37 @@
+{
+  "namespace": "hud",
+  "quick_utility_drop_one@common_buttons.light_text_button": {
+    "$button_text": "Q",
+    "$pressed_button_name": "button.hotbar_drop_one",
+    "size": [36, 30],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "offset": [256, -84],
+    "layer": 100
+  },
+  "quick_utility_drop_stack@common_buttons.light_text_button": {
+    "$button_text": "Stack",
+    "$pressed_button_name": "button.hotbar_drop_all",
+    "size": [46, 30],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "offset": [300, -84],
+    "layer": 100
+  },
+  "root_panel": {
+    "modifications": [
+      {
+        "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          {
+            "quick_utility_drop_one@hud.quick_utility_drop_one": {}
+          },
+          {
+            "quick_utility_drop_stack@hud.quick_utility_drop_stack": {}
+          }
+        ]
+      }
+    ]
+  }
+}
